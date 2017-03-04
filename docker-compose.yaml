@@ -1,9 +1,9 @@
 version: '2'
 services:
   easy_ssb_pub:
-    build: .
+    image: locksmithdon/easy-ssb-pub
     environment:
-      PUB_URL: "${PUB_URL}"
+      PUB_URL: pub.locksmithdon.net
       SSB_PATH: /shared/.ssb
     ports:
       - "80:80"

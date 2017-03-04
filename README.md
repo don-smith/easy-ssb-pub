@@ -18,15 +18,11 @@ However, to join the wider SSB network, you must get a dedicated invitation from
 
 ## How to deploy
 
-You will need a server that supports exposing ports other than just 80. This means [Heroku](https://heroku.com/) or [Zeit Now](https://zeit.co/now) will *not* work.
-
-### Deploy using Docker
-
-Recommended servers-on-demand services: [Digital Ocean Docker Droplet](https://www.digitalocean.com/products/one-click-apps/docker/), [Amazon LightSail](https://amazonlightsail.com/), [Vultr](https://vultr.com/), [Linode](https://www.linode.com), etc.
+You will need a server that supports a TCP sockets on port 80 and UDP sockets on ports 8008 and 8007. This means [Heroku](https://heroku.com/) or [Zeit Now](https://zeit.co/now) will *not* work. Recommended services for servers-on-demand: [Digital Ocean Docker Droplet](https://www.digitalocean.com/products/one-click-apps/docker/), [UpCloud](https://upcloud.com/), [Amazon LightSail](https://amazonlightsail.com/), [Vultr](https://vultr.com/), [Linode](https://www.linode.com), etc.
 
 1. Access your server via shell (e.g. SSH)
-3. `docker pull staltz/easy-ssb-pub`
-4. `docker run -e "PUB_URL=publicurltoyourserv.er" -e "PORT=80" -p 80:80 -p 8008:8008 -i -t staltz/easy-ssb-pub --name ssb-pub`
+2. `docker pull staltz/easy-ssb-pub`
+3. `docker run -e "PUB_URL=publicurltoyourserv.er" -v $HOME/.ssb:/root/.ssb -p 80:80 -p 8008:8008 -p 8007:8007 -m 450M --memory-swap 1G --restart=unless-stopped --name ssb-pub -d staltz/easy-ssb-pub`
 
 After the container has been created, stop/start/restart the server using:
 
@@ -36,12 +32,20 @@ After the container has been created, stop/start/restart the server using:
 
 _`docker run` creates a new container (and server key) each time. This prevents existing contacts from successfully completing the handshake._
 
-### Deploy without Docker
+### OR
+
+1. Acess your server via shell (e.g. SSH)
+2. `git clone https://github.com/staltz/easy-ssb-pub.git`
+3. `cd easy-ssb-pub`
+4. `PUB_URL=publicurltoyourserv.er docker-compose up -d`
+
+### OR
 
 1. Access your server via shell (e.g. SSH)
-2. Install nvm: `curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.0/install.sh | bash`
-3. Restart the shell
-4. `nvm install v6.9.1`
-5. `git clone https://github.com/staltz/easy-ssb-pub.git`
-6. `npm install`
-7. `PORT=80 PUB_URL="publicurltoyourserv.er" npm start`
+2. `apt-get install -y libleveldb-dev curl libc6 libcurl3 zlib1g libtool autoconf`
+3. Install nvm: `curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.0/install.sh | bash`
+4. Restart the shell
+5. `nvm install v6.9.1`
+6. `git clone https://github.com/staltz/easy-ssb-pub.git`
+7. `npm install`
+8. `PUB_URL=publicurltoyourserv.er npm start`

@@ -4,14 +4,24 @@ import minimist = require('minimist');
 import ssbKeys = require('ssb-keys');
 import path = require('path');
 import qr = require('qr-image');
+import net = require('net');
+import swarm = require('discovery-swarm');
+import ternaryStream = require('ternary-stream');
+import createDebug = require('debug');
 
-// Setup Express app ===========================================================
-const app = express();
-app.use(express.static(__dirname + '/public'));
-app.use(require('body-parser').urlencoded({ extended: true }));
-app.set('port', (process.env.PORT || 3000));
-app.set('views', __dirname + '/../pages');
-app.set('view engine', 'ejs');
+const debug = createDebug('easy-ssb-pub');
+
+let SBOT_PORT = 8008;
+const SWARM_PORT = sbotPortToSwarmPort(SBOT_PORT);
+const HTTP_PORT = 80;
+
+function swarmPortToSbotPort(swarmPort) {
+  return swarmPort + 1;
+}
+
+function sbotPortToSwarmPort(sbotPort) {
+  return sbotPort - 1;
+}
 
 // Setup Scuttlebot ============================================================
 let argv = process.argv.slice(2);
@@ -20,7 +30,8 @@ const conf = argv.slice(i + 1);
 argv = ~i ? argv.slice(0, i) : argv;
 
 const config = require('ssb-config/inject')(process.env.ssb_appname, minimist(conf));
-const keys = ssbKeys.loadOrCreateSync(path.join(config.path, 'secret'));
+config.keys = ssbKeys.loadOrCreateSync(path.join(config.path, 'secret'));
+config.port = SBOT_PORT;
 const createSbot = ssbClient
     .use(require('scuttlebot/plugins/plugins'))
     .use(require('scuttlebot/plugins/master'))
@@ -33,7 +44,6 @@ const createSbot = ssbClient
     .use(require('scuttlebot/plugins/local'))
     .use(require('scuttlebot/plugins/logging'))
     .use(require('scuttlebot/plugins/private'));
-config.keys = keys;
 const bot = createSbot(config);
 
 interface QRSVG {
@@ -41,43 +51,67 @@ interface QRSVG {
   path: string;
 }
 
-interface BotIdentity {
-  id: string;
-  qr: QRSVG;
-}
+const idQR = qr.svgObject(bot.id);
 
-let thisBotIdentity: BotIdentity | null = null;
-
-bot.whoami((err, identity: {id: string}) => {
+bot.address((err, addr) => {
   if (err) {
     console.error(err);
     process.exit(1);
   } else {
-    thisBotIdentity = {
-      id: identity.id,
-      qr: qr.svgObject(identity.id) as QRSVG,
-    };
-    console.log('This bot\'s identity is:', identity.id);
+    debug('Scuttlebot app is running on address %s', addr);
+    SBOT_PORT = (/\:(\d+)\~/g.exec(addr) as any)[1];
   }
 });
 
-// Setup Express routes ========================================================
+// Setup Discovery Swarm =======================================================
+var peer = swarm({
+  maxConnections: 1000,
+  utp: true,
+  id: 'ssb:' + bot.id,
+});
+
+peer.listen(SWARM_PORT)
+peer.join('ssb-discovery-swarm', {announce: true}, function () {
+  debug('Joining discovery swarm under the channel "ssb-discovery-swarm"');
+});
+
+peer.on('connection', function (connection, _info) {
+  const info = _info;
+  info.id = info.id.toString('ascii');
+  if (info.id.indexOf('ssb:') === 0 && info.host && info.host !== config.host) {
+    debug('Found discovery swarm peer %s:%s, %s', info.host, info.port, info._peername);
+
+    const remoteSbotHost = info.host;
+    const remoteSbotKey = info.id.split('ssb:')[1];
+    const remoteSbotPort = swarmPortToSbotPort(info.port);
+    const addr = `${remoteSbotHost}:${remoteSbotPort}:${remoteSbotKey}`;
+    debug(`Connecting to SSB peer ${addr} found through discovery swarm`);
+    bot.gossip.connect(addr, function (err) {
+      if (err) {
+        console.error(err);
+      } else {
+        debug('Successfully connected to remote SSB peer ' + addr);
+      }
+    });
+  }
+})
+
+// Setup Express app ===========================================================
+const app = express();
+app.use(express.static(__dirname + '/public'));
+app.use(require('body-parser').urlencoded({ extended: true }));
+app.set('port', HTTP_PORT);
+app.set('views', __dirname + '/../pages');
+app.set('view engine', 'ejs');
+
 type Route = '/' | '/invited';
 
 app.get('/' as Route, (req: express.Request, res: express.Response) => {
-  function tryToRender() {
-    if (thisBotIdentity) {
-      res.render('index', {
-        id: thisBotIdentity.id,
-        qrSize: thisBotIdentity.qr.size,
-        qrPath: thisBotIdentity.qr.path,
-      });
-    } else {
-      setTimeout(tryToRender, 200);
-    }
-  }
-
-  tryToRender();
+  res.render('index', {
+    id: bot.id,
+    qrSize: idQR.size,
+    qrPath: idQR.path,
+  });
 });
 
 app.get('/invited' as Route, (req: express.Request, res: express.Response) => {
@@ -93,9 +127,9 @@ app.get('/invited' as Route, (req: express.Request, res: express.Response) => {
         qrPath: qrCode.path,
       });
     }
-  })
+  });
 });
 
 app.listen(app.get('port'), () => {
-  console.log('Node app is running on port', app.get('port'));
+  debug('Express app is running on port %s', app.get('port'));
 });

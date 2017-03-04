@@ -23,7 +23,7 @@
   "devDependencies": {},
   "scripts": {
     "compile": "tsc",
-    "start": "tsc && node dist/index --host $PUB_URL"
+    "start": "tsc && node dist/index --host $PUB_URL --path $SSB_PATH"
   },
   "engines": {
     "node": "6.9.1"

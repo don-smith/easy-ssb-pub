@@ -10,7 +10,8 @@ services:
       - "8008:8008"
       - "8007:8007"
     container_name: easy-ssb-pub
-    mem_limit: 768M
+    mem_limit: 450M
+    memswap_limit: 1G
     volumes:
       - $HOME/shared:/shared
     restart: unless-stopped

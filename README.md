@@ -22,7 +22,7 @@ You will need a server that supports a TCP sockets on port 80 and UDP sockets on
 
 1. Access your server via shell (e.g. SSH)
 2. `docker pull staltz/easy-ssb-pub`
-3. `docker run -e "PUB_URL=publicurltoyourserv.er" -v $HOME/.ssb:/root/.ssb -p 80:80 -p 8008:8008 -p 8007:8007 -m 450M --memory-swap 1G --restart=unless-stopped --name ssb-pub -d staltz/easy-ssb-pub`
+3. `docker run -e "PUB_URL=publicurltoyourserv.er" -e "SSB_PATH=/shared/.ssb" -v $HOME/.ssb:/root/.ssb -p 80:80 -p 8008:8008 -p 8007:8007 -m 450M --memory-swap 1G --restart=unless-stopped --name ssb-pub -d staltz/easy-ssb-pub`
 
 After the container has been created, stop/start/restart the server using:
 
@@ -48,4 +48,4 @@ _`docker run` creates a new container (and server key) each time. This prevents 
 5. `nvm install v6.9.1`
 6. `git clone https://github.com/staltz/easy-ssb-pub.git`
 7. `npm install`
-8. `PUB_URL=publicurltoyourserv.er npm start`
+8. `PUB_URL=publicurltoyourserv.er SSB_PATH=/shared/.ssb npm start`
